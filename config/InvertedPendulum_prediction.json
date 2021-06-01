@@ -1,0 +1,17 @@
+{
+    "env_id": "InvertedPendulum-v2",
+    "training_config": {
+        "robust_params": {
+            "enabled": true,
+            "strategy_opts": {
+                "actor_reg": 1.0
+            },
+            "eps_scheduler": {
+                "end": 0.3
+            }
+        },
+        "state_dim": 4,
+        "action_dim": 1,
+        "pol_reg": true
+    }
+}

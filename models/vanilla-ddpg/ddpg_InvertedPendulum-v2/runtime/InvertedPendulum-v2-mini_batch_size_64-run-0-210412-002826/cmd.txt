@@ -1,0 +1,1 @@
+eval_ddpg.py --config config/InvertedPendulum_robust.json --path_prefix models/vanilla-ddpg test_config:attack_params:enabled=true test_config:attack_params:eps=.3 test_config:attack_params:type="sarsa"
