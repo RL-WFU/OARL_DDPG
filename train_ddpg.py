@@ -42,7 +42,7 @@ def ddpg_continuous(config_dict):
     ddpg_config.setdefault('log_level', 0)
     config = Config()
     config.merge(ddpg_config)
-
+    config.training = True
     config.task_fn = lambda: Task(config.game)
     config.eval_env = config.task_fn()
     config.max_steps = training_config['num_frames']

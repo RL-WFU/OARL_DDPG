@@ -20,7 +20,10 @@ class BaseAgent:
         self.logger = get_logger(tag=config.tag, log_level=config.log_level, models_path=config.models_path)
         self.task_ind = 0
         self.oarl_model = None
-        self.OARL = self.config.OARL
+        if self.config.training:
+            self.OARL = False
+        else:
+            self.OARL = self.config.OARL
         if self.OARL:
             self.use_detect = self.config.OARL_params['detect']
         else:
@@ -71,6 +74,7 @@ class BaseAgent:
         raise NotImplementedError
 
     def detect_attack(self, predicted_state, obs):
+        #Current implemented detection method for OARL
         difference = np.sum(np.abs(predicted_state - obs))
         if difference > self.config.attack_params['eps'] / 2:
             detected = True
@@ -164,10 +168,12 @@ class BaseAgent:
                         oarl_input = np.concatenate([in_state, in_action], axis=1)
                         predicted_state = self.oarl_predict(oarl_input)
                         predicted_state = np.reshape(predicted_state, state_shape)
+                        predicted_state = in_state + predicted_state
+               
                         predicted = True
                     else:
                         predicted = False
-                else: #Something probably wrong with this section
+                else:
                     if steps > 3:
                         oarl_states = states[-4:]
                         oarl_actions = actions[-4:]
@@ -212,7 +218,6 @@ class BaseAgent:
 
             next_state, reward, done, info = env.step(action)
 
-            #print(np.asarray(done).shape)
 
             transitions.append((state[0], action[0], next_state[0], done, predicted, attacked, detected))
             states.append(state[0])
@@ -238,15 +243,9 @@ class BaseAgent:
         mae = None
         if len(state_differences) > 0:
             mae = sum(state_differences) / len(state_differences)
-            print("MAE among predicted states: {}".format(mae))
-            if len(state_differences) > 4:
-                print("MAE among first 5 predictions: {}".format(sum(state_differences[:5]) / 5))
 
-        print("Attack rate: {}".format(num_attacks / steps))
 
-        if return_states:
-            return ret, states, actions, certify_losses_l1, certify_losses_l2, certify_losses_linf, certify_losses_range, transitions, mae
-        return ret
+        return ret, states, actions, certify_losses_l1, certify_losses_l2, certify_losses_linf, certify_losses_range, transitions, mae
 
     def eval_episodes(self):
         episodic_returns = []

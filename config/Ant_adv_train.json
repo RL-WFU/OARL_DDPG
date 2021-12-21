@@ -4,6 +4,9 @@
         "critic_lr": 0.0001,
         "robust_params": {
             "enabled": true,
+            "strategy": [
+                "adv_training"
+            ],
             "strategy_opts": {
                 "actor_reg": 100.0
             },
@@ -12,15 +15,16 @@
             }
         }
     },
+    "models_path": "./{env_id}_.2/",
     "test_config": {
         "attack_params": {
             "eps": 0.2,
-            "sarsa_action_ratio": 0.99
+            "sarsa_action_ratio": 0.999
         },
         "sarsa_params": {
             "sarsa_reg": 10.0,
             "action_eps_scheduler": {
-                "end": 0.3,
+                "end": 0.1,
                 "steps": 20000.0,
                 "start_step": 20000.0
             },
@@ -33,10 +37,7 @@
                 "steps": 20000.0,
                 "start_step": 20000.0
             }
-        },
-        "OARL_params": {
-            "model_name": "Ant/Frank_models/Ant_State_Dense_New.keras",
-            "lstm": false
+
         }
     },
     "data_config": {

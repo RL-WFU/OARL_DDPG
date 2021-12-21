@@ -3,7 +3,8 @@
 # Permission given to modify the code as long as you keep this        #
 # declaration at the top                                              #
 #######################################################################
-
+import numpy as np
+import torch
 from deep_rl import *
 import sys
 from argparser import argparser
@@ -11,8 +12,8 @@ from config import load_config
 from OARL_prediction.State_Prediction_Policy_Model import PredictionWithPolicy
 
 # from robust_ddpg import RobustDDPGAgent, RobustDeterministicActorCriticNet
-import numpy as np
-import torch
+#import numpy as np
+#import torch
 import copy
 import matplotlib.pyplot as plt
 plt.style.use('ggplot')
@@ -36,7 +37,32 @@ def states_statics(states, logger):
     print(mean_str)
     print(std_str)
 
-def ddpg_eval(config):
+def run_evalutation(config, agent):
+    all_states = []
+    all_actions = []
+    episodic_returns = []
+    for ep in range(agent.config.eval_episodes):
+        total_rewards, states, actions, certify_loss_l1, certify_loss_l2, certify_loss_linf, certify_loss_range, tran, mae = agent.eval_episode(show=agent.config.show_game, return_states=True,
+                                                    certify_eps=agent.config.certify_params["eps"] if agent.config.certify_params["enabled"] else 0.0, episode_number=ep)
+
+        if ep == 0:
+            transitions = np.asarray(tran)
+        else:
+            transitions = np.concatenate([transitions, np.asarray(tran)], axis=0)
+
+        
+        agent.logger.info('epoch %d reward %f steps %d', ep, total_rewards, len(states))
+        episodic_returns.append(np.sum(total_rewards))
+        all_states.append(np.array(states))
+        all_actions.append(np.array(actions))
+    
+    return all_states, all_actions, episodic_returns, transitions
+    
+
+def single_ddpg_eval(config):
+    """
+    This function handles evaluation of the agent under the attack parameters specified in the config file. General use-case function for evaluation.
+    """
     agent = RobustDDPGAgent(config)
     agent.logger.info('Evaluation started!\n %s', str(config.__dict__))
     best_model = os.path.join(agent.config.models_path, "model_best") #ALTER BEST ATTACK MODEL
@@ -52,74 +78,17 @@ def ddpg_eval(config):
     else:
         print("will not save transition")
 
-    episodic_returns = []
-    all_states = []
-    all_actions = []
-    certify_losses_l1 = []
-    certify_losses_l2 = []
-    certify_losses_linf = []
-    certify_losses_range = []
-    maes = []
+    all_states, all_actions, episodic_returns, transitions = run_evalutation(config, agent)
 
-    """
-    epsilons = [0, .5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5]
-    epsilon_rewards = []
-    rates = [1, 0.75, 0.5, 0.25]
-
-    for r in rates:
-        agent.set_attack_rate(r)
-        print("Attack rate: {}", r)
-
-        for e in epsilons:
-
-            agent.set_epsilon(e)
-            print("Epsilon: {}", e)
-    """
-
-    for ep in range(agent.config.eval_episodes):
-        total_rewards, states, actions, certify_loss_l1, certify_loss_l2, certify_loss_linf, certify_loss_range, tran, mae = agent.eval_episode(show=agent.config.show_game, return_states=True,
-                certify_eps=agent.config.certify_params["eps"] if agent.config.certify_params["enabled"] else 0.0, episode_number=ep)
-
-        if ep == 0:
-            transitions = np.asarray(tran)
-        else:
-            transitions = np.concatenate([transitions, np.asarray(tran)], axis=0)
-            print(transitions.shape)
-
-        if mae is not None:
-            maes.append(mae)
-
-        if agent.config.certify_params["enabled"]:
-            agent.logger.info('epoch %d reward %f steps %d certified_loss l1=%.4f l2=%.4f linf=%.4f range=%.4f', ep, total_rewards, len(states),
-                    (np.mean(certify_loss_l1)), (np.mean(certify_loss_l2)), (np.mean(certify_loss_linf)), (np.mean(certify_loss_range)))
-        else:
-            agent.logger.info('epoch %d reward %f steps %d', ep, total_rewards, len(states))
-        episodic_returns.append(np.sum(total_rewards))
-        all_states.append(np.array(states))
-        all_actions.append(np.array(actions))
-        certify_losses_l1.append(np.array(certify_loss_l1))
-        certify_losses_l2.append(np.array(certify_loss_l2))
-        certify_losses_linf.append(np.array(certify_loss_linf))
-        certify_losses_range.append(np.array(certify_loss_range))
     # Each episode may have different length, so we concat all to one
     all_states = np.concatenate(all_states, axis=0)
     all_actions = np.concatenate(all_actions, axis=0)
     mean_return = np.mean(episodic_returns)
-    if agent.config.certify_params["enabled"]:
-        certify_losses_l1 = np.concatenate(certify_losses_l1, axis=0)
-        certify_losses_l2 = np.concatenate(certify_losses_l2, axis=0)
-        certify_losses_linf = np.concatenate(certify_losses_linf, axis=0)
-        certify_losses_range = np.concatenate(certify_losses_range, axis=0)
     agent.logger.info('states variable statistics')
     states_statics(all_states, agent.logger)
     agent.logger.info('action variable statistics')
     states_statics(all_actions, agent.logger)
     agent.logger.info('Average Reward: %f, min reward: %f, std: %f, max: %f', mean_return, np.min(episodic_returns), np.std(episodic_returns), np.max(episodic_returns))
-    if agent.config.certify_params["enabled"]:
-        agent.logger.info('Average certify loss l1: %f, max certify loss: %f, std: %f', np.mean(certify_losses_l1), np.max(certify_losses_l1), np.std(certify_losses_l1))
-        agent.logger.info('Average certify loss l2: %f, max certify loss: %f, std: %f', np.mean(certify_losses_l2), np.max(certify_losses_l2), np.std(certify_losses_l2))
-        agent.logger.info('Average certify loss linf: %f, max certify loss: %f, std: %f', np.mean(certify_losses_linf), np.max(certify_losses_linf), np.std(certify_losses_linf))
-        agent.logger.info('Average certify loss range: %f, max certify loss: %f, std: %f', np.mean(certify_losses_range), np.max(certify_losses_range), np.std(certify_losses_range))
     agent.logger.info('[END-END-END] Finishing evaluation')
 
     if config.save_transition_path is not None:
@@ -129,31 +98,59 @@ def ddpg_eval(config):
         transitions = np.asarray(transitions)
         np.save(outfile, transitions)
 
-        """
-        Pendulum: State (4,) Action (1,) (action is cts -3 to 3)
-        Ant: State (111,) Action (8,) (action is cts -1 to 1)
-        Hopper: State (11,) Action (3,) (action is cts -1 to 1)
-        """
-        print(transitions.shape)
-        print('State shape: {}'.format(transitions[0, 0].shape))
-        print('Action shape: {}'.format(transitions[0, 1].shape))
-
-    if len(maes) > 0:
-        print("Average MAE of Prediction model: {}".format(sum(maes) / len(maes)))
-
-    #epsilon_rewards.append(mean_return)
 
 
-        #plt.plot(epsilons, epsilon_rewards, label='{}'.format(r))
+def repeated_ddpg_eval(config):
+    agent = RobustDDPGAgent(config)
+    agent.logger.info('Evaluation started!\n %s', str(config.__dict__))
+    best_model = os.path.join(agent.config.models_path, "model_best") #ALTER BEST ATTACK MODEL
+    agent.logger.info('Loading %s', best_model)
+    if config.attack_params['type'].startswith('sarsa'):
+        agent.load_sarsa(best_model)
+    else:
+        agent.load(best_model)
+
+    if config.save_transition_path is not None:
+        print("will save transition")
+    else:
+        print("will not save transition")
+
+
+
+    epsilons = [0, .3, 1.5, 5]
+    rates = [1, 0.75, 0.5, 0.25, 0]
     """
-    plt.xlabel('Epsilon')
-    plt.ylabel('Reward')
-    plt.title('Pendulum Reward vs Epsilon by Attack Rate')
-    plt.ylim([0, 1000])
-    plt.legend()
-    plt.show()
+    Repeated evaluation loops through different levels of epsilon and attack rate, evaluating the agent according to the procedure in run_evaluation. Used for quick testing and plotting of different attack parameters in one run.
     """
+    for r in rates:
+        agent.set_attack_rate(r)
+        print("Attack rate: {}", r)
 
+        for e in epsilons:
+
+            agent.set_epsilon(e)
+            print("Epsilon: {}", e)
+    
+
+            all_states, all_actions, episodic_returns, transitions = run_evalutation(config, agent)
+
+            # Each episode may have different length, so we concat all to one
+            all_states = np.concatenate(all_states, axis=0)
+            all_actions = np.concatenate(all_actions, axis=0)
+            mean_return = np.mean(episodic_returns)
+            agent.logger.info('states variable statistics')
+            states_statics(all_states, agent.logger)
+            agent.logger.info('action variable statistics')
+            states_statics(all_actions, agent.logger)
+            agent.logger.info('Average Reward: %f, min reward: %f, std: %f, max: %f', mean_return, np.min(episodic_returns), np.std(episodic_returns), np.max(episodic_returns))
+            agent.logger.info('[END-END-END] Finishing evaluation')
+
+            if config.save_transition_path is not None:
+                outfile = config.save_transition_path
+                outfile = outfile + "_transition.npy"
+
+                transitions = np.asarray(transitions)
+                np.save(outfile, transitions)
 
 
 
@@ -170,7 +167,7 @@ def ddpg_eval_setup(config_dict,suffix="", eval=True):
     ddpg_config.setdefault('log_level', 0)
     config = Config()
     config.merge(ddpg_config)
-
+    config.training = False
     config.task_fn = lambda: Task(config.game)
     config.eval_env = config.task_fn()
     print(config.eval_env)
@@ -246,7 +243,10 @@ def ddpg_eval_setup(config_dict,suffix="", eval=True):
     sys.stdout.flush()
     sys.stderr.flush()
 
-    ddpg_eval(config)
+    if config['repeat_test']:
+        repeated_ddpg_eval(config)
+    else:
+        single_ddpg_eval(config)
 
 USE_CUDA = torch.cuda.is_available()
 def main(args):
@@ -260,6 +260,10 @@ def main(args):
     mkdir(os.path.join(config['models_path'], 'tf_log'))
     mkdir(os.path.join(config['models_path'], 'runtime'))
 
+    if args.repeat_test is not None:
+        config['repeat_test'] = args.repeat_test
+    else:
+        config['repeat_test'] = False
 
 
     print("Use_cuda: {}".format(USE_CUDA))

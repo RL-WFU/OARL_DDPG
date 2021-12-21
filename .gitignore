@@ -125,3 +125,7 @@ OARL_prediction/Pendulum/history_Pend_State_Dense.npy
 OARL_prediction/Pendulum/history_Pend_State_LSTM.npy
 transitions/*
 
+#Slurm files
+adv_train.slurm
+adv_train_out/*
+
