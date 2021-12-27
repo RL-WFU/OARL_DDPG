@@ -23,6 +23,14 @@ eval_ddpg.py --config config/InvertedPendulum_vanilla.json --path_prefix models/
 
 eval_ddpg.py --config config/InvertedPendulum_vanilla.json --path_prefix models/vanilla-ddpg --repeat_test True test_config:attack_params:enabled=true 
 
+### To run OARL for Inverted Pendulum
+
+eval_ddpg.py --config config/InvertedPendulum_vanilla.json --path_prefix models/vanilla-ddpg test_config:attack_params:enabled=true  test_config:OARL=true
+
+### To run Inverted Pendulum vanilla and save transitions
+
+eval_ddpg.py --config config/InvertedPendulum_vanilla.json --path_prefix models/vanilla-ddpg test_config:save_transition_path="transitions/pend_transitions"
+
 ### General Usage:
 
 General configuration parameters are set in the **defaults.json** file. To run evaluation, we specify an additional config file, i.e **InvertedPendulum_vanilla.json** which overrides some parameters in defaults.json.
@@ -32,6 +40,8 @@ The specific config file designates the environment, attack epsilon, and paramet
 To enable/disable the OARL defense mechanism see defaults.json. Ensure test_config:OARL=true
 Specific OARL detection model paths and other OARL parameters should be controlled via the specific config file, or through command line arguments.
 
+Implementation of attacks are done in robust_ddpg.py
+Implementation of OARL agent is in deep_rl/agent/BaseAgent.py
 
 ## Reference
 

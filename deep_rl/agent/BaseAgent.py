@@ -250,7 +250,7 @@ class BaseAgent:
     def eval_episodes(self):
         episodic_returns = []
         for ep in range(self.config.eval_episodes):
-            total_rewards = self.eval_episode()
+            total_rewards, _, _, _, _, _, _, _, _ = self.eval_episode()
             episodic_returns.append(np.sum(total_rewards))
         self.logger.info('steps %d, episodic_return_test %.2f(%.2f)' % (
             self.total_steps, np.mean(episodic_returns), np.std(episodic_returns) / np.sqrt(len(episodic_returns))
